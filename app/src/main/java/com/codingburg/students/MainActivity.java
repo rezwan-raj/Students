@@ -1,36 +1,40 @@
 package com.codingburg.students;
 
-
 import android.os.Bundle;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.TextView;
+import android.widget.ListView;
+import android.widget.ArrayAdapter;
+import android.widget.Toast;
 
 import android.content.SharedPreferences;
 
-
 import androidx.appcompat.app.AppCompatActivity;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 
 public class MainActivity extends AppCompatActivity {
 
-    // Declare UI variables
+    // UI
     EditText etName, etRoll, etBatch, etSearchRoll;
-    Button btnSubmit, btnSearch;
-    TextView tvResult;
-    SharedPreferences sharedPreferences;
+    Button btnSubmit, btnSearch, btnShowAll;
+    ListView listViewStudents;
 
+    // Storage
+    SharedPreferences sharedPreferences;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        // Connect this activity with activity_main.xml
         setContentView(R.layout.activity_main);
+
+        // SharedPreferences
         sharedPreferences = getSharedPreferences("StudentDB", MODE_PRIVATE);
 
-
-        // Initialize UI components
+        // Init UI
         etName = findViewById(R.id.etName);
         etRoll = findViewById(R.id.etRoll);
         etBatch = findViewById(R.id.etBatch);
@@ -38,9 +42,11 @@ public class MainActivity extends AppCompatActivity {
 
         btnSubmit = findViewById(R.id.btnSubmit);
         btnSearch = findViewById(R.id.btnSearch);
+        btnShowAll = findViewById(R.id.btnShowAll);
 
-        tvResult = findViewById(R.id.tvResult);
+        listViewStudents = findViewById(R.id.listViewStudents);
 
+        // ---------------- SUBMIT ----------------
         btnSubmit.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -50,25 +56,30 @@ public class MainActivity extends AppCompatActivity {
                 String batch = etBatch.getText().toString().trim();
 
                 if (name.equals("") || roll.equals("") || batch.equals("")) {
-                    tvResult.setText("Please fill all fields");
+                    Toast.makeText(MainActivity.this,
+                            "Please fill all fields",
+                            Toast.LENGTH_SHORT).show();
                     return;
                 }
-
-                SharedPreferences.Editor editor = sharedPreferences.edit();
 
                 String key = "student_" + roll;
                 String value = name + "," + batch;
 
-                editor.putString(key, value);
-                editor.apply();
+                sharedPreferences.edit()
+                        .putString(key, value)
+                        .apply();
 
-                tvResult.setText("Student Saved Successfully");
+                Toast.makeText(MainActivity.this,
+                        "Student Saved Successfully",
+                        Toast.LENGTH_SHORT).show();
 
                 etName.setText("");
                 etRoll.setText("");
                 etBatch.setText("");
             }
         });
+
+        // ---------------- SEARCH ----------------
         btnSearch.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -76,7 +87,9 @@ public class MainActivity extends AppCompatActivity {
                 String searchRoll = etSearchRoll.getText().toString().trim();
 
                 if (searchRoll.equals("")) {
-                    tvResult.setText("Please enter roll to search");
+                    Toast.makeText(MainActivity.this,
+                            "Please enter roll to search",
+                            Toast.LENGTH_SHORT).show();
                     return;
                 }
 
@@ -84,25 +97,89 @@ public class MainActivity extends AppCompatActivity {
                 String savedData = sharedPreferences.getString(key, null);
 
                 if (savedData == null) {
-                    tvResult.setText("Student not found");
-                } else {
-                    String[] parts = savedData.split(",");
-
-                    String name = parts[0];
-                    String batch = parts[1];
-
-                    tvResult.setText(
-                            "Student Found\n" +
-                                    "Name: " + name + "\n" +
-                                    "Roll: " + searchRoll + "\n" +
-                                    "Batch: " + batch
-                    );
+                    Toast.makeText(MainActivity.this,
+                            "Student not found",
+                            Toast.LENGTH_SHORT).show();
+                    return;
                 }
+
+                String[] parts = savedData.split(",");
+                String name = parts[0];
+                String batch = parts[1];
+
+                ArrayList<String> singleResult = new ArrayList<>();
+                singleResult.add(
+                        "Roll: " + searchRoll + "\n" +
+                                "Name: " + name + "\n" +
+                                "Batch: " + batch
+                );
+
+                ArrayAdapter<String> adapter =
+                        new ArrayAdapter<>(
+                                MainActivity.this,
+                                android.R.layout.simple_list_item_1,
+                                singleResult
+                        );
+
+                listViewStudents.setAdapter(adapter);
             }
         });
 
+        // ---------------- SHOW ALL (ROLL-WISE) ----------------
+        btnShowAll.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
 
+                ArrayList<String> studentKeys = new ArrayList<>();
+
+                // collect keys
+                for (String key : sharedPreferences.getAll().keySet()) {
+                    if (key.startsWith("student_")) {
+                        studentKeys.add(key);
+                    }
+                }
+
+                // sort by roll number
+                Collections.sort(studentKeys, new Comparator<String>() {
+                    @Override
+                    public int compare(String k1, String k2) {
+                        int r1 = Integer.parseInt(k1.replace("student_", ""));
+                        int r2 = Integer.parseInt(k2.replace("student_", ""));
+                        return r1 - r2;
+                    }
+                });
+
+                ArrayList<String> displayList = new ArrayList<>();
+
+                for (int i = 0; i < studentKeys.size(); i++) {
+                    String key = studentKeys.get(i);
+                    String roll = key.replace("student_", "");
+
+                    String value = sharedPreferences.getString(key, "");
+                    String[] parts = value.split(",");
+
+                    displayList.add(
+                            "Roll: " + roll + "\n" +
+                                    "Name: " + parts[0] + "\n" +
+                                    "Batch: " + parts[1]
+                    );
+                }
+
+                if (displayList.size() == 0) {
+                    Toast.makeText(MainActivity.this,
+                            "No students found",
+                            Toast.LENGTH_SHORT).show();
+                    listViewStudents.setAdapter(null);
+                } else {
+                    ArrayAdapter<String> adapter =
+                            new ArrayAdapter<>(
+                                    MainActivity.this,
+                                    android.R.layout.simple_list_item_1,
+                                    displayList
+                            );
+                    listViewStudents.setAdapter(adapter);
+                }
+            }
+        });
     }
-
-
 }
