@@ -1,14 +1,16 @@
 package com.codingburg.students;
 
+import android.app.AlertDialog;
+import android.content.DialogInterface;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ListView;
-import android.widget.ArrayAdapter;
 import android.widget.Toast;
-
-import android.content.SharedPreferences;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -43,10 +45,16 @@ public class MainActivity extends AppCompatActivity {
         btnSubmit = findViewById(R.id.btnSubmit);
         btnSearch = findViewById(R.id.btnSearch);
         btnShowAll = findViewById(R.id.btnShowAll);
+  /*      etName.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                etName.setText("saikat");
+            }
+        });*/
 
         listViewStudents = findViewById(R.id.listViewStudents);
 
-        // ---------------- SUBMIT ----------------
+        // ---------------- SUBMIT (SAVE / UPDATE) ----------------
         btnSubmit.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -69,9 +77,7 @@ public class MainActivity extends AppCompatActivity {
                         .putString(key, value)
                         .apply();
 
-                Toast.makeText(MainActivity.this,
-                        "Student Saved Successfully",
-                        Toast.LENGTH_SHORT).show();
+                Toast.makeText(MainActivity.this, "Student Saved / Updated", Toast.LENGTH_SHORT).show();
 
                 etName.setText("");
                 etRoll.setText("");
@@ -104,14 +110,12 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 String[] parts = savedData.split(",");
-                String name = parts[0];
-                String batch = parts[1];
 
                 ArrayList<String> singleResult = new ArrayList<>();
                 singleResult.add(
                         "Roll: " + searchRoll + "\n" +
-                                "Name: " + name + "\n" +
-                                "Batch: " + batch
+                                "Name: " + parts[0] + "\n" +
+                                "Batch: " + parts[1]
                 );
 
                 ArrayAdapter<String> adapter =
@@ -132,14 +136,12 @@ public class MainActivity extends AppCompatActivity {
 
                 ArrayList<String> studentKeys = new ArrayList<>();
 
-                // collect keys
                 for (String key : sharedPreferences.getAll().keySet()) {
                     if (key.startsWith("student_")) {
                         studentKeys.add(key);
                     }
                 }
 
-                // sort by roll number
                 Collections.sort(studentKeys, new Comparator<String>() {
                     @Override
                     public int compare(String k1, String k2) {
@@ -181,5 +183,90 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
         });
+
+        // ---------------- CLICK STUDENT (UPDATE / DELETE) ----------------
+        listViewStudents.setOnItemClickListener(
+                new AdapterView.OnItemClickListener() {
+                    @Override
+                    public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+
+                        String item = parent.getItemAtPosition(position).toString();
+                        String rollLine = item.split("\n")[0]; // Roll: X
+                        String roll = rollLine.replace("Roll: ", "").trim();
+
+                        showUpdateDeleteDialog(roll);
+                    }
+                }
+        );
+    }
+
+    // ---------------- DIALOG ----------------
+    private void showUpdateDeleteDialog(final String roll) {
+
+        AlertDialog.Builder builder =
+                new AlertDialog.Builder(MainActivity.this);
+
+        builder.setTitle("Choose Action");
+
+        builder.setItems(
+                new String[]{"Update", "Delete", "Cancel"},
+                new DialogInterface.OnClickListener() {
+                    @Override
+                    public void onClick(DialogInterface dialog, int which) {
+
+                        if (which == 0) {
+                            loadStudentForUpdate(roll);
+                        }
+                        else if (which == 1) {
+                            deleteStudent(roll);
+                        }
+                        else {
+                            dialog.dismiss();
+                        }
+                    }
+                }
+        );
+
+        builder.show();
+    }
+
+    // ---------------- LOAD FOR UPDATE ----------------
+    private void loadStudentForUpdate(String roll) {
+
+        String key = "student_" + roll;
+        String value = sharedPreferences.getString(key, null);
+
+        if (value == null) {
+            Toast.makeText(this, "Student not found", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        String[] parts = value.split(",");
+
+        etName.setText(parts[0]);
+        etRoll.setText(roll);
+        etBatch.setText(parts[1]);
+
+        Toast.makeText(
+                this,
+                "Edit and press Submit to update",
+                Toast.LENGTH_LONG
+        ).show();
+    }
+
+    // ---------------- DELETE ----------------
+    private void deleteStudent(String roll) {
+
+        sharedPreferences.edit()
+                .remove("student_" + roll)
+                .apply();
+
+        Toast.makeText(
+                this,
+                "Student deleted",
+                Toast.LENGTH_SHORT
+        ).show();
+
+        listViewStudents.setAdapter(null);
     }
 }
